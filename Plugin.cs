@@ -14,6 +14,7 @@ using UnityEngine;
 using MU3.Util;
 using System.Threading;
 using MU3.TestMode;
+using MU3.Game;
 namespace LiveStreamTool;
 
 [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
@@ -139,6 +140,14 @@ public class Plugin : BaseUnityPlugin
     public static void StartPlayHook(){
         asyncState.StartPlay();
         Logger.LogInfo($"Play started");
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(MU3.Battle.GameEngine), "calcCurrentBattleResult")]
+    public static void FailPlayHook(SessionResult sessionResult){
+        if(sessionResult.battleResult.playResult == PlayResult.Failed){
+            asyncState.FailPlay();
+        }
     }
 
     [HarmonyPostfix]

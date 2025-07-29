@@ -239,6 +239,27 @@ public class CurrentScore : Score
         isAllBreakPlus = techScore >= 1010000L;
     }
 
+    public void LoadFromFailedGame(GameEngine gameEngine, GameState gameState){
+        if (gameEngine == null) return;
+
+        totalBell = (long)Reflections._tsjBellTotalField.GetValue(gameEngine.counters);
+        totalNote = (long)Reflections._tsjNoteTotalField.GetValue(gameEngine.counters) / 10L;
+        techScore = (int)(long)Reflections._techScoreField.GetValue(gameEngine.counters);
+        scoreNote = (long)Reflections._techScoreNoteField.GetValue(gameEngine.counters);
+        scoreBell = (long)Reflections._techScoreBellField.GetValue(gameEngine.counters);
+        bellLost = (long)Reflections._tsjBellTotalField.GetValue(gameEngine.counters) - (long)Reflections._tsjBellCurrentField.GetValue(gameEngine.counters);
+        platinumScore = (int)(long)Reflections._tsjPlatinumScoreCurrentField.GetValue(gameEngine.counters);
+        if (platinumScore < 0){
+            platinumScore = 0;
+        }
+        int[] scoreCounters = (int[])Reflections._scoresField.GetValue(gameEngine.counters);
+        damage = scoreCounters[(int)MU3.Battle.ScoreType.BulletHitCount];
+        isFullBell = bellLost == 0;
+        isFullCombo = scoreCounters[(int)MU3.Battle.ScoreType.Miss] == 0;
+        isAllBreak = isFullCombo && scoreCounters[(int)MU3.Battle.ScoreType.Hit] == 0;
+        isAllBreakPlus = techScore >= 1010000L;
+    }
+    
     public void CopyFrom(CurrentScore rhs){
         base.CopyFrom(rhs);
         bellLost = rhs.bellLost;
@@ -269,6 +290,13 @@ public static class Reflections{
     public static readonly FieldInfo _tsjBellLostField;
     public static readonly FieldInfo _scoresField;
 
+    // For failed plays
+    public static readonly FieldInfo _techScoreField;
+    public static readonly FieldInfo _techScoreNoteField;
+    public static readonly FieldInfo _techScoreBellField;
+    public static readonly FieldInfo _tsjPlatinumScoreCurrentField;
+    public static readonly FieldInfo _tsjBellCurrentField;
+
     static Reflections()
     {
         _techScoreLostField = AccessTools.Field(typeof(MU3.Battle.Counters), "_techScoreLost");
@@ -278,6 +306,13 @@ public static class Reflections{
         _techScoreBellLostField = AccessTools.Field(typeof(MU3.Battle.Counters), "_techScoreBellLost");
         _tsjBellLostField = AccessTools.Field(typeof(MU3.Battle.Counters), "_tsjBellLost");
         _scoresField = AccessTools.Field(typeof(MU3.Battle.Counters), "_scores");
+
+        // For failed plays
+        _techScoreField = AccessTools.Field(typeof(MU3.Battle.Counters), "_techScore");
+        _techScoreNoteField = AccessTools.Field(typeof(MU3.Battle.Counters), "_techScoreNote");
+        _techScoreBellField = AccessTools.Field(typeof(MU3.Battle.Counters), "_techScoreBell");
+        _tsjPlatinumScoreCurrentField = AccessTools.Field(typeof(MU3.Battle.Counters), "_tsjPlatinumScoreCurrent");
+        _tsjBellCurrentField = AccessTools.Field(typeof(MU3.Battle.Counters), "_tsjBellCurrent");
     }
 }
 
@@ -287,6 +322,7 @@ public class GameState
     public bool isInGame;
     public bool isMusicSelected;
     public bool isInResult;
+    public bool isFailedPlay;
     public int musicId;
     public bool isCurrentVersion;
     public string musicTitle;
@@ -314,14 +350,32 @@ public class GameState
     public float n10_raw_delta;
     // ============Loaded============
     public CurrentScore current;
+    // ============Flags============
+    public bool hasReadFailedStats;
 
-    public GameState() {
+    public GameState()
+    {
         Reset();
     }
 
     public void UpdateState(GameEngine gameEngine){
-        if(isInGame){
-            current.LoadFromGame(gameEngine, this);
+        // It has to be reset in this weird way
+        if (!isFailedPlay && hasReadFailedStats) hasReadFailedStats = false;
+
+        if (!hasReadFailedStats)
+        {
+            if (isInGame)
+            {
+                if (isFailedPlay)
+                {
+                   current.LoadFromFailedGame(gameEngine, this);
+                   hasReadFailedStats = true;
+                }
+                else
+                {
+                    current.LoadFromGame(gameEngine, this);
+                }
+            }
         }
         Calculate();
     }
@@ -353,6 +407,7 @@ public class GameState
         platinumScoreLost = state.platinumScoreLost;
         isCurrentVersion = state.isCurrentVersion;
         isInResult = state.isInResult;
+        isFailedPlay = state.isFailedPlay;
         playCount = state.playCount;
         retryCount = state.retryCount < 1 ? 1 : state.retryCount;
         b50 = state.b50_1000 / 1000.0f;
@@ -403,6 +458,8 @@ public class GameState
         return isInGame == rhs.isInGame &&
             isMusicSelected == rhs.isMusicSelected &&
             isInResult == rhs.isInResult &&
+            isFailedPlay == rhs.isFailedPlay &&
+            hasReadFailedStats == rhs.hasReadFailedStats &&
             musicId == rhs.musicId &&
             musicTitle == rhs.musicTitle &&
             musicArtist == rhs.musicArtist &&
@@ -435,6 +492,8 @@ public class GameState
         isInGame = false;
         isMusicSelected = false;
         isInResult = false;
+        isFailedPlay = false;
+        hasReadFailedStats = false;
         musicId = 0;
         musicTitle = "N/A";
         musicArtist = "N/A";
@@ -467,6 +526,8 @@ public class GameState
         isInGame = rhs.isInGame;
         isMusicSelected = rhs.isMusicSelected;
         isInResult = rhs.isInResult;
+        isFailedPlay = rhs.isFailedPlay;
+        hasReadFailedStats = rhs.hasReadFailedStats;
         musicId = rhs.musicId;
         musicTitle = rhs.musicTitle;
         musicLevel = rhs.musicLevel;

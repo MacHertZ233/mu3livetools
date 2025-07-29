@@ -21,6 +21,7 @@ public class AsyncState
     public string musicArtist;
     public bool isInPlay;
     public bool isInResult;
+    public bool isFailedPlay;
     public bool isMusicSelected;
     public int platinumScoreMax;
     public int platinumScoreLost;
@@ -133,11 +134,17 @@ public class AsyncState
 
     public void StartPlay() {
         isInPlay = true;
+        isFailedPlay = false;
     }
 
     public void StartTry() {
         isInPlay = true;
+        isFailedPlay = false;
         ++retryCount;
+    }
+
+    public void FailPlay() {
+        isFailedPlay = true;
     }
 
     public void EnterResult() {
@@ -147,6 +154,7 @@ public class AsyncState
     public void EndPlay() {
         isInPlay = false;
         isInResult = false;
+        isFailedPlay = false;
         retryCount = 0;
         ResetCounter();
     }
